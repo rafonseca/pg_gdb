@@ -6,7 +6,7 @@ tNode = lookup_type("Node")
 tList = lookup_type("List")
 tNodeTag = lookup_type("NodeTag")
 
-IDENT_SPACES = 4
+IDENT_SPACES = 2
 
 
 class IdentPrinter(ValuePrinter):
@@ -18,11 +18,11 @@ class NodePrinter(IdentPrinter):
         self._label = label
         
     def to_string(self):
-        IdentPrinter.ident += IDENT_SPACES
         return self._label
 
     def children(self):
         def _iter():
+            IdentPrinter.ident += IDENT_SPACES
             for field in self._val.type.fields():
                 assert field.name is not None
                 yield  " "*IdentPrinter.ident + field.name, self._val[field.name]
@@ -36,11 +36,11 @@ class ListPrinter(IdentPrinter):
         self._val = val
 
     def to_string(self):
-        IdentPrinter.ident += IDENT_SPACES
         return f"LIST"
 
     def children(self):
         def _iter():
+            IdentPrinter.ident += IDENT_SPACES
             for i in range(self._val["length"]):
                 try:
                     yield " "*IdentPrinter.ident + f"[{i}]", (
