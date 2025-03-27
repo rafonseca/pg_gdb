@@ -6,11 +6,15 @@ tNode = lookup_type("Node")
 tList = lookup_type("List")
 tNodeTag = lookup_type("NodeTag")
 
-IDENT_SPACES = 2
+ident_spaces = 2
+skip_empty=True
 
 
 class IdentPrinter(ValuePrinter):
     ident = 0
+
+def ident_name(name:str)->str:
+    return " "*IdentPrinter.ident + name
     
 class NodePrinter(IdentPrinter):
     def __init__(self, val: Value,label="NODE*") -> None:
@@ -22,11 +26,15 @@ class NodePrinter(IdentPrinter):
 
     def children(self):
         def _iter():
-            IdentPrinter.ident += IDENT_SPACES
+            IdentPrinter.ident += ident_spaces
             for field in self._val.type.fields():
                 assert field.name is not None
-                yield  " "*IdentPrinter.ident + field.name, self._val[field.name]
-            IdentPrinter.ident -= IDENT_SPACES
+                name = field.name
+                value = self._val[name]
+                if skip_empty and not value:
+                    continue
+                yield  ident_name(name), value
+            IdentPrinter.ident -= ident_spaces
 
         return _iter()
 
@@ -40,17 +48,18 @@ class ListPrinter(IdentPrinter):
 
     def children(self):
         def _iter():
-            IdentPrinter.ident += IDENT_SPACES
+            IdentPrinter.ident += ident_spaces
             for i in range(self._val["length"]):
                 try:
-                    yield " "*IdentPrinter.ident + f"[{i}]", (
+                    yield ident_name(f"[{i}]"), (
                         self._val["elements"][i]["ptr_value"]
                         .cast(tNode.pointer())
                         .format_string()
                     )
-                except:
+                except Exception as exc:
+                    print(exc)
                     continue
-            IdentPrinter.ident -= IDENT_SPACES
+            IdentPrinter.ident -= ident_spaces
         return _iter()
 
 
