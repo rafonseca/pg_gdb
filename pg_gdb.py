@@ -55,7 +55,7 @@ class ListPrinter(IdentPrinter):
 
 
 def dispatcher(val: Value):
-    if val.type in [lookup_type(t) for t in ["Plan","Expr","Integer"]]:
+    if val.type in [lookup_type(t) for t in ["Plan","Expr","Integer","Tuplestorestate","TSReadPointer"]]:
         return NodePrinter(val,label="NODE")
     try:
         val = val.dereference()
