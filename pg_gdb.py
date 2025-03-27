@@ -1,5 +1,4 @@
-from gdb.printing import register_pretty_printer, RegexpCollectionPrettyPrinter
-from gdb import Value, Type, ValuePrinter, pretty_printers, lookup_type
+from gdb import Value, ValuePrinter, pretty_printers, lookup_type
 
 
 tNode = lookup_type("Node")
@@ -7,20 +6,22 @@ tList = lookup_type("List")
 tNodeTag = lookup_type("NodeTag")
 
 ident_spaces = 2
-skip_empty=True
+skip_empty = True
 
 
 class IdentPrinter(ValuePrinter):
     ident = 0
 
-def ident_name(name:str)->str:
-    return " "*IdentPrinter.ident + name
-    
+
+def ident_name(name: str) -> str:
+    return " " * IdentPrinter.ident + name
+
+
 class NodePrinter(IdentPrinter):
-    def __init__(self, val: Value,label="NODE*") -> None:
+    def __init__(self, val: Value, label="NODE*") -> None:
         self._val = val
         self._label = label
-        
+
     def to_string(self):
         return self._label
 
@@ -33,7 +34,7 @@ class NodePrinter(IdentPrinter):
                 value = self._val[name]
                 if skip_empty and not value:
                     continue
-                yield  ident_name(name), value
+                yield ident_name(name), value
             IdentPrinter.ident -= ident_spaces
 
         return _iter()
@@ -60,12 +61,16 @@ class ListPrinter(IdentPrinter):
                     print(exc)
                     continue
             IdentPrinter.ident -= ident_spaces
+
         return _iter()
 
 
 def dispatcher(val: Value):
-    if val.type in [lookup_type(t) for t in ["Plan","Expr","Integer","Tuplestorestate","TSReadPointer"]]:
-        return NodePrinter(val,label="NODE")
+    if val.type in [
+        lookup_type(t)
+        for t in ["Plan", "Expr", "Integer", "Tuplestorestate", "TSReadPointer"]
+    ]:
+        return NodePrinter(val, label="NODE")
     try:
         val = val.dereference()
     except:
@@ -81,8 +86,8 @@ def dispatcher(val: Value):
 
     try:
         node_type = val.cast(tNode)["type"].format_string()
-        if node_type in ["T_Invalid","T_AllocSetContext"]:
-            return 
+        if node_type in ["T_Invalid", "T_AllocSetContext"]:
+            return
     except:
         return
 
