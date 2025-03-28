@@ -3,77 +3,79 @@ from gdb import Value, ValuePrinter, pretty_printers, lookup_type
 
 tNode = lookup_type("Node")
 tList = lookup_type("List")
+
+
 tNodeTag = lookup_type("NodeTag")
 
-ident_spaces = 2
+
 skip_empty = True
 
-
-class IdentPrinter(ValuePrinter):
-    ident = 0
+smart_print = True
 
 
-def ident_name(name: str) -> str:
-    return " " * IdentPrinter.ident + name
-
-
-class NodePrinter(IdentPrinter):
+class NodePrinter(ValuePrinter):
     def __init__(self, val: Value, label="NODE*") -> None:
         self._val = val
         self._label = label
 
-    def to_string(self):
-        return self._label
-
     def children(self):
         def _iter():
-            IdentPrinter.ident += ident_spaces
             for field in self._val.type.fields():
                 assert field.name is not None
                 name = field.name
                 value = self._val[name]
                 if skip_empty and not value:
                     continue
-                yield ident_name(name), value
-            IdentPrinter.ident -= ident_spaces
+                yield name, value
 
         return _iter()
 
 
-class ListPrinter(IdentPrinter):
-    def __init__(self, val: Value) -> None:
+class ListPrinter(ValuePrinter):
+    def __init__(self, val: Value, node_type: str) -> None:
         self._val = val
+        self._node_type = node_type
 
-    def to_string(self):
-        return f"LIST"
+    def display_hint(self):
+        return "array"
 
     def children(self):
         def _iter():
-            IdentPrinter.ident += ident_spaces
+            node_type = self._node_type
+            ListCell_field = {
+                "T_List": "ptr_value",
+                "T_OidList": "oid_value",
+                "T_IntList": "int_value",
+                "T_XidList": "xid_value",
+            }
+
             for i in range(self._val["length"]):
                 try:
-                    yield ident_name(f"[{i}]"), (
-                        self._val["elements"][i]["ptr_value"]
-                        .cast(tNode.pointer())
-                        .format_string()
-                    )
+                    value = self._val["elements"][i][ListCell_field[node_type]]
+                    if node_type == "T_List":
+                        value = value.cast(tNode.pointer())
+                    yield str(i), value
+
                 except Exception as exc:
                     print(exc)
                     continue
-            IdentPrinter.ident -= ident_spaces
 
         return _iter()
 
 
 def dispatcher(val: Value):
+
+    if not smart_print:
+        return
     if val.type in [
         lookup_type(t)
         for t in ["Plan", "Expr", "Integer", "Tuplestorestate", "TSReadPointer"]
     ]:
-        return NodePrinter(val, label="NODE")
+        return NodePrinter(val)
     try:
         val = val.dereference()
     except:
+
         # only dispatch pointer fields. non-pointer fields are handled
         # by other printers
         return
@@ -86,16 +88,25 @@ def dispatcher(val: Value):
 
     try:
         node_type = val.cast(tNode)["type"].format_string()
-        if node_type in ["T_Invalid", "T_AllocSetContext"]:
+        if node_type in [
+            "T_Invalid",
+            "T_AllocSetContext",  # causes circular ref?
+            "T_WithCheckOption",  # workaround: char* gets wrongly converted to T_WithCheckOption
+            # note: should avoid char* conversion and remove entry above
+        ]:
+
             return
     except:
         return
 
-    if node_type in ["T_List"]:  # TODO: handle other types of list
-        return ListPrinter(val.cast(tList))
+    if node_type in ["T_List", "T_IntList", "T_OidList", "T_XidList"]:
+        return ListPrinter(val.cast(tList), node_type)
+
     if node_type.startswith("T_"):
         val = val.cast(lookup_type(node_type[2:]))
         return NodePrinter(val)
 
 
+if len(pretty_printers) > 1:
+    pretty_printers.pop(0)
 pretty_printers.insert(0, dispatcher)
